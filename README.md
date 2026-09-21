@@ -200,6 +200,61 @@ Pasos que ejecuta:
 
 Si falla el paso de credenciales (OIDC/rol), no se genera imagen nueva y por eso la URL publica sigue mostrando la version anterior. En ese caso reviso trust policy del rol y permisos de GitHub Actions.
 
+## Incidencia real que me paso y como la atiendo
+
+En esta practica, varios runs fallaron en el paso `Configure AWS credentials`.
+
+Lo que significa en la practica:
+
+1. El pipeline ni siquiera llega al build de Docker.
+2. No se sube imagen nueva a ECR.
+3. El Deployment sigue con la ultima imagen valida (`bootstrap` en este caso).
+4. La URL publica sigue viva, pero sin los cambios nuevos.
+
+### Checklist que sigo cuando pasa este error
+
+1. Ver exactamente el paso que fallo en Actions.
+2. Validar el provider OIDC en AWS.
+3. Validar trust policy del rol.
+4. Confirmar que el workflow tiene `permissions.id-token: write`.
+5. Reintentar con push nuevo despues de corregir trust policy.
+
+Comandos utiles que dejo listos:
+
+```bash
+# 1) Ver estado de runs
+curl -s https://api.github.com/repos/jonathan-vallecillos/ejercicio-curso/actions/runs?per_page=5
+
+# 2) Ver pasos del job para ubicar falla exacta
+curl -s https://api.github.com/repos/jonathan-vallecillos/ejercicio-curso/actions/runs/<RUN_ID>/jobs
+
+# 3) Validar provider OIDC
+aws iam get-open-id-connect-provider \
+  --open-id-connect-provider-arn arn:aws:iam::580446611735:oidc-provider/token.actions.githubusercontent.com
+
+# 4) Validar trust policy vigente del rol
+aws iam get-role --role-name GitHubOIDCDeployRole
+```
+
+### Ajuste que aplique para estabilizar
+
+Para evitar bloqueos por variaciones de `sub` entre eventos/refs de GitHub, deje el trust policy del repo en modo:
+
+`repo:jonathan-vallecillos/ejercicio-curso:*`
+
+Eso mantiene el alcance en este repo (no abre a otros repositorios) y me evita fallas por formato de subject.
+
+Cuando el pipeline ya este estable, puedo endurecerlo de nuevo a una rama puntual si lo necesito.
+
+## Si quiero forzar redeploy manual cuando CI/CD falla
+
+Si el workflow sigue fallando y necesito publicar urgente, tengo dos opciones:
+
+1. Build/push local (si Docker daemon esta disponible) y luego `kubectl set image`.
+2. Corregir OIDC primero y repetir push para que quede todo trazado por pipeline.
+
+Yo prefiero la opcion 2 para mantener auditoria limpia por commit en Actions.
+
 ## Ventajas que estoy aprovechando con Kubernetes + AWS
 
 Esto es lo que mas me aporta en esta practica:
