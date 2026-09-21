@@ -31,6 +31,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Debug OIDC claims
+        run: |
+          set -euo pipefail
+          TOKEN_JSON=$(curl -sSf -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com")
+          ID_TOKEN=$(python3 -c "import sys, json; print(json.load(sys.stdin)['value'])" <<< "$TOKEN_JSON")
+          PAYLOAD=$(python3 -c "import sys, base64; t=sys.argv[1].split('.')[1]; t += '=' * (-len(t) % 4); print(base64.urlsafe_b64decode(t.encode()).decode())" "$ID_TOKEN")
+          SUB=$(python3 -c "import sys, json; print(json.load(sys.stdin).get('sub',''))" <<< "$PAYLOAD")
+          REPOSITORY=$(python3 -c "import sys, json; print(json.load(sys.stdin).get('repository',''))" <<< "$PAYLOAD")
+          REF=$(python3 -c "import sys, json; print(json.load(sys.stdin).get('ref',''))" <<< "$PAYLOAD")
+          AUD=$(python3 -c "import sys, json; print(json.load(sys.stdin).get('aud',''))" <<< "$PAYLOAD")
+          echo "::notice title=OIDC Claims::sub=$SUB repository=$REPOSITORY ref=$REF aud=$AUD"
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
