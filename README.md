@@ -256,6 +256,14 @@ aws iam update-open-id-connect-provider-thumbprint \
   --thumbprint-list 6938fd4d98bab03faadb97b34396831e3780aea1
 ```
 
+Adicionalmente, en el workflow deje este ajuste para evitar problemas de `sts:TagSession` al asumir el rol por OIDC:
+
+```yaml
+with:
+  role-skip-session-tagging: true
+  audience: sts.amazonaws.com
+```
+
 Eso mantiene el alcance en este repo (no abre a otros repositorios) y me evita fallas por formato de subject.
 
 Cuando el pipeline ya este estable, puedo endurecerlo de nuevo a una rama puntual si lo necesito.
