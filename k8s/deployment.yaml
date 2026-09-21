@@ -26,8 +26,16 @@ spec:
           ports:
             - containerPort: 3000
           env:
+            - name: APP_NAME
+              value: jonathan-eks-lab
             - name: AWS_REGION
               value: us-east-1
+            - name: CLUSTER_NAME
+              value: jonathan-eks-lab
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
             - name: HOSTNAME
               valueFrom:
                 fieldRef:

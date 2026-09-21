@@ -155,6 +155,19 @@ Checks aplicados:
 
 Si en red corporativa no resuelve DNS, probar desde red externa (hotspot, red residencial, etc.).
 
+## Datos nuevos que ahora muestra la UI
+
+Ademas de app/version/commit/pod, agregue datos operativos para tener mejor visibilidad en runtime:
+
+1. `cluster` y `namespace`.
+2. `memory_rss_mb` y `node_version`.
+3. `pid` del proceso.
+4. `started_at` y `now` en formato ISO.
+5. `build_date` de la imagen.
+6. Datos del request entrante (`host`, `x-forwarded-proto`, `x-forwarded-for`, modo html/json).
+
+Esto me ayuda a validar rapido si realmente estoy pegandole al pod correcto, si cambio de replica, y si estoy viendo una imagen nueva.
+
 ## Como manejo cambios y redeploy (mi flujo real)
 
 Cuando hago un cambio (por ejemplo en UI o en la API), sigo este flujo:
@@ -318,6 +331,48 @@ aws eks associate-access-policy \
 ```
 
 Con eso, el rol puede ejecutar `kubectl apply` desde el runner de GitHub Actions.
+
+## Cloudflare gratis para tener dominio estable encima del ALB
+
+Si, si se puede. La opcion mas practica y gratis es usar **Cloudflare Workers** como reverse proxy y exponerlo con dominio de Workers (`*.workers.dev`) o con tu dominio propio en Cloudflare.
+
+Deje archivos listos en:
+
+1. [cloudflare/worker.js](cloudflare/worker.js)
+2. [cloudflare/wrangler.toml](cloudflare/wrangler.toml)
+
+### Opcion A (gratis inmediata): subdominio workers.dev
+
+1. Instalar Wrangler:
+
+```bash
+npm install -g wrangler
+```
+
+2. Login en Cloudflare:
+
+```bash
+wrangler login
+```
+
+3. Deploy del worker:
+
+```bash
+cd cloudflare
+wrangler deploy
+```
+
+4. Cloudflare te devuelve una URL tipo:
+
+`https://eks-curso-proxy.<tu-cuenta>.workers.dev`
+
+### Opcion B (dominio propio en Cloudflare, plan free)
+
+Si tienes un dominio en Cloudflare, puedes crear una ruta para el Worker (ejemplo `app.tudominio.com/*`) y dejarlo como frente publico estable, mientras el origen sigue siendo el ALB de EKS.
+
+### Nota sobre Cloudflare Pages
+
+Pages esta mas orientado a sitios estaticos/Jamstack. Para proxy de un backend vivo en EKS, Worker es el camino correcto.
 
 ## Ventajas que estoy aprovechando con Kubernetes + AWS
 

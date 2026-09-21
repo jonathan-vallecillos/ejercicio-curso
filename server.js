@@ -7,19 +7,56 @@ const APP_NAME = process.env.APP_NAME || "jonathan-eks-lab";
 const APP_VERSION = process.env.APP_VERSION || "1.0.0";
 const GIT_SHA = process.env.GIT_SHA || "local";
 const AWS_REGION = process.env.AWS_REGION || "unknown-region";
+const CLUSTER_NAME = process.env.CLUSTER_NAME || "unknown-cluster";
+const NAMESPACE = process.env.NAMESPACE || "demo";
+const BUILD_DATE = process.env.BUILD_DATE || "unknown";
 const POD_NAME = process.env.HOSTNAME || "local";
 const NODE_NAME = process.env.NODE_NAME || "";
 const PORT = Number(process.env.PORT || 3000);
 
-function buildState() {
+function normalizeIp(value) {
+  if (!value) return undefined;
+  return String(value).split(",")[0].trim() || undefined;
+}
+
+function shortCommit(sha) {
+  if (!sha || sha === "local") return sha;
+  return String(sha).slice(0, 12);
+}
+
+function buildState(req) {
+  const now = Date.now();
+  const rssMb = Math.round(process.memoryUsage().rss / (1024 * 1024));
+  const acceptsHtml = /(^|,\s*)text\/html(\s*;|,|$)/i.test(req?.headers?.accept || "");
+
   return {
     app: APP_NAME,
     version: APP_VERSION,
     commit: GIT_SHA,
+    commit_short: shortCommit(GIT_SHA),
     region: AWS_REGION,
+    cluster: CLUSTER_NAME,
+    namespace: NAMESPACE,
+    build_date: BUILD_DATE,
     pod: POD_NAME,
     node: NODE_NAME || undefined,
-    uptime_s: Math.max(0, Math.floor((Date.now() - startedAt) / 1000)),
+    uptime_s: Math.max(0, Math.floor((now - startedAt) / 1000)),
+    started_at: new Date(startedAt).toISOString(),
+    now: new Date(now).toISOString(),
+    process: {
+      pid: process.pid,
+      node_version: process.version,
+      memory_rss_mb: rssMb,
+      port: PORT,
+    },
+    request: {
+      method: req?.method,
+      path: req?.path,
+      host: req?.headers?.host,
+      forwarded_proto: req?.headers?.["x-forwarded-proto"],
+      forwarded_for: normalizeIp(req?.headers?.["x-forwarded-for"]),
+      accepts_html: acceptsHtml,
+    },
   };
 }
 
@@ -28,17 +65,17 @@ app.get("/healthz", (_req, res) => {
 });
 
 app.get("/api", (_req, res) => {
-  res.json(buildState());
+  res.json(buildState(_req));
 });
 
 app.get("/", (req, res) => {
   const acceptsHtml = /(^|,\s*)text\/html(\s*;|,|$)/i.test(req.headers.accept || "");
 
   if (!acceptsHtml) {
-    return res.json(buildState());
+    return res.json(buildState(req));
   }
 
-  res.type("html").send(renderPage(buildState()));
+  res.type("html").send(renderPage(buildState(req)));
 });
 
 app.listen(PORT, () => {
@@ -278,11 +315,19 @@ function renderPage(state) {
           <tbody>
             <tr><th>app</th><td>${escapeHtml(state.app)}</td></tr>
             <tr><th>version</th><td>${escapeHtml(state.version)}</td></tr>
-            <tr><th>commit</th><td>${escapeHtml(state.commit)}</td></tr>
+            <tr><th>commit</th><td>${escapeHtml(state.commit_short || state.commit)}</td></tr>
             <tr><th>region</th><td>${escapeHtml(state.region)}</td></tr>
+            <tr><th>cluster</th><td>${escapeHtml(state.cluster)}</td></tr>
+            <tr><th>namespace</th><td>${escapeHtml(state.namespace)}</td></tr>
             <tr><th>pod</th><td>${escapeHtml(state.pod)}</td></tr>
             <tr><th>node</th><td>${escapeHtml(state.node || "not-set")}</td></tr>
             <tr><th>uptime</th><td>${escapeHtml(`${state.uptime_s}s`)}</td></tr>
+            <tr><th>memory</th><td>${escapeHtml(`${state.process.memory_rss_mb} MB`)}</td></tr>
+            <tr><th>node.js</th><td>${escapeHtml(state.process.node_version)}</td></tr>
+            <tr><th>pid</th><td>${escapeHtml(String(state.process.pid))}</td></tr>
+            <tr><th>build date</th><td>${escapeHtml(state.build_date)}</td></tr>
+            <tr><th>started at</th><td>${escapeHtml(state.started_at)}</td></tr>
+            <tr><th>now</th><td>${escapeHtml(state.now)}</td></tr>
           </tbody>
         </table>
       </article>
@@ -301,6 +346,22 @@ function renderPage(state) {
           <div class="metric">
             <b>home endpoint</b>
             <span>/ -> html/json</span>
+          </div>
+          <div class="metric">
+            <b>request host</b>
+            <span>${escapeHtml(state.request.host || "unknown")}</span>
+          </div>
+          <div class="metric">
+            <b>forwarded proto</b>
+            <span>${escapeHtml(state.request.forwarded_proto || "unknown")}</span>
+          </div>
+          <div class="metric">
+            <b>client ip</b>
+            <span>${escapeHtml(state.request.forwarded_for || "unknown")}</span>
+          </div>
+          <div class="metric">
+            <b>render mode</b>
+            <span>${escapeHtml(state.request.accepts_html ? "html" : "json")}</span>
           </div>
         </div>
         <div class="note">

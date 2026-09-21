@@ -60,10 +60,12 @@ jobs:
         env:
           REGISTRY: ${{ steps.ecr.outputs.registry }}
           TAG: ${{ github.sha }}
+          BUILD_DATE: ${{ github.event.head_commit.timestamp }}
         run: |
           docker build \
             --build-arg APP_VERSION=$TAG \
             --build-arg GIT_SHA=$TAG \
+            --build-arg BUILD_DATE=$BUILD_DATE \
             -t $REGISTRY/$ECR_REPO:$TAG .
           docker push $REGISTRY/$ECR_REPO:$TAG
 
