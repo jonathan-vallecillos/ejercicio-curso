@@ -1,9 +1,9 @@
 {
-  "name": "eks-deploy-lab",
+  "name": "jonathan-eks-lab",
   "version": "1.0.0",
   "private": true,
   "main": "server.js",
-  "description": "Node.js app for an AWS EKS + ALB deployment lab",
+  "description": "Jonathan's Node.js app for AWS EKS + ALB deployment",
   "scripts": {
     "start": "node server.js"
   },

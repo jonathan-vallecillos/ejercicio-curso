@@ -21,13 +21,13 @@ spec:
     spec:
       containers:
         - name: web
-          image: YOUR_AWS_ACCOUNT_ID.dkr.ecr.YOUR_AWS_REGION.amazonaws.com/YOUR_ECR_REPO:YOUR_INITIAL_TAG
+          image: 580446611735.dkr.ecr.us-east-1.amazonaws.com/ejercicio-curso-app:bootstrap
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3000
           env:
             - name: AWS_REGION
-              value: YOUR_AWS_REGION
+              value: us-east-1
             - name: HOSTNAME
               valueFrom:
                 fieldRef:

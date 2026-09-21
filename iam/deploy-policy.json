@@ -17,13 +17,13 @@
         "ecr:PutImage",
         "ecr:UploadLayerPart"
       ],
-      "Resource": "arn:aws:ecr:YOUR_AWS_REGION:YOUR_AWS_ACCOUNT_ID:repository/YOUR_ECR_REPO"
+      "Resource": "arn:aws:ecr:us-east-1:580446611735:repository/ejercicio-curso-app"
     },
     {
       "Sid": "DescribeCluster",
       "Effect": "Allow",
       "Action": "eks:DescribeCluster",
-      "Resource": "arn:aws:eks:YOUR_AWS_REGION:YOUR_AWS_ACCOUNT_ID:cluster/YOUR_CLUSTER_NAME"
+      "Resource": "arn:aws:eks:us-east-1:580446611735:cluster/jonathan-eks-lab"
     }
   ]
 }

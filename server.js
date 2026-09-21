@@ -3,7 +3,7 @@ const express = require("express");
 const app = express();
 const startedAt = Date.now();
 
-const APP_NAME = process.env.APP_NAME || "eks-deploy-lab";
+const APP_NAME = process.env.APP_NAME || "jonathan-eks-lab";
 const APP_VERSION = process.env.APP_VERSION || "1.0.0";
 const GIT_SHA = process.env.GIT_SHA || "local";
 const AWS_REGION = process.env.AWS_REGION || "unknown-region";

@@ -15,9 +15,9 @@ permissions:
   contents: read
 
 env:
-  AWS_REGION: YOUR_AWS_REGION
-  CLUSTER_NAME: YOUR_CLUSTER_NAME
-  ECR_REPO: YOUR_ECR_REPO
+  AWS_REGION: us-east-1
+  CLUSTER_NAME: jonathan-eks-lab
+  ECR_REPO: ejercicio-curso-app
   NAMESPACE: demo
   DEPLOYMENT: web
   CONTAINER: web
@@ -54,6 +54,13 @@ jobs:
 
       - name: Configure kubeconfig
         run: aws eks update-kubeconfig --name $CLUSTER_NAME --region $AWS_REGION
+
+      - name: Apply Kubernetes manifests
+        run: |
+          kubectl apply -f k8s/namespace.yaml
+          kubectl apply -f k8s/deployment.yaml
+          kubectl apply -f k8s/service.yaml
+          kubectl apply -f k8s/ingress.yaml
 
       - name: Update deployment image
         env:
