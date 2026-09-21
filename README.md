@@ -248,11 +248,10 @@ aws iam get-role --role-name GitHubOIDCDeployRole
 
 Para evitar bloqueos por variaciones de `sub` entre eventos/refs de GitHub, deje el trust policy del repo en modo:
 
-usar claims estables en `StringEquals`:
+AWS exige que el trust policy incluya condicion sobre `sub` (o `job_workflow_ref`), asi que lo deje con dos patrones para cubrir ambos formatos:
 
-1. `token.actions.githubusercontent.com:aud = sts.amazonaws.com`
-2. `token.actions.githubusercontent.com:repository = jonathan-vallecillos/ejercicio-curso`
-3. `token.actions.githubusercontent.com:ref = refs/heads/main`
+1. `repo:jonathan-vallecillos/ejercicio-curso:ref:refs/heads/main`
+2. `repo:jonathan-vallecillos@*/ejercicio-curso@*:ref:refs/heads/main`
 
 Tambien ajuste el proveedor OIDC de AWS al thumbprint recomendado para GitHub:
 
