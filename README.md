@@ -286,6 +286,39 @@ Si el workflow sigue fallando y necesito publicar urgente, tengo dos opciones:
 
 Yo prefiero la opcion 2 para mantener auditoria limpia por commit en Actions.
 
+## Segunda incidencia real: OIDC OK, pero falla `Apply Kubernetes manifests`
+
+Despues de corregir OIDC, el pipeline ya lograba:
+
+1. asumir rol,
+2. login a ECR,
+3. build/push.
+
+Pero fallaba en `Apply Kubernetes manifests`.
+
+La causa fue que el rol `GitHubOIDCDeployRole` todavia no tenia permisos dentro del cluster EKS (RBAC/acceso EKS), aunque ya podia autenticarse en AWS.
+
+### Como lo resolvi
+
+Le cree un access entry en EKS al rol y le asocie policy de admin de cluster:
+
+```bash
+aws eks create-access-entry \
+  --cluster-name jonathan-eks-lab \
+  --principal-arn arn:aws:iam::580446611735:role/GitHubOIDCDeployRole \
+  --type STANDARD \
+  --region us-east-1
+
+aws eks associate-access-policy \
+  --cluster-name jonathan-eks-lab \
+  --principal-arn arn:aws:iam::580446611735:role/GitHubOIDCDeployRole \
+  --policy-arn arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy \
+  --access-scope type=cluster \
+  --region us-east-1
+```
+
+Con eso, el rol puede ejecutar `kubectl apply` desde el runner de GitHub Actions.
+
 ## Ventajas que estoy aprovechando con Kubernetes + AWS
 
 Esto es lo que mas me aporta en esta practica:
