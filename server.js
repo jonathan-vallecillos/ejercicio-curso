@@ -67,17 +67,18 @@ function renderPage(state) {
   <title>${escapeHtml(state.app)} | runtime board</title>
   <style>
     :root {
-      --paper: #f7f2e9;
-      --ink: #132222;
-      --muted: #465b5c;
-      --line: #d2c7b8;
-      --card: #fffdf8;
-      --accent: #bf4f24;
-      --accent-2: #0f7a75;
-      --ok: #177f45;
+      --bg: #f4f7fb;
+      --ink: #142033;
+      --muted: #4e6281;
+      --line: #d4dfef;
+      --card: #ffffff;
+      --accent: #f97316;
+      --accent-2: #0e7490;
+      --ok: #15803d;
+      --chip: #f0f5ff;
       --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      --serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, serif;
-      --sans: "Aptos", "Segoe UI", Tahoma, sans-serif;
+      --serif: "Constantia", "Times New Roman", serif;
+      --sans: "Trebuchet MS", "Segoe UI", Tahoma, sans-serif;
     }
 
     * { box-sizing: border-box; }
@@ -85,17 +86,11 @@ function renderPage(state) {
     body {
       margin: 0;
       color: var(--ink);
-      font-family: var(--serif);
+      font-family: var(--sans);
       background:
-        linear-gradient(180deg, rgba(255,255,255,0.3), rgba(255,255,255,0.3)),
-        repeating-linear-gradient(
-          0deg,
-          transparent,
-          transparent 31px,
-          rgba(19,34,34,0.05) 31px,
-          rgba(19,34,34,0.05) 32px
-        ),
-        var(--paper);
+        radial-gradient(circle at 12% 8%, rgba(14, 116, 144, 0.16), transparent 38%),
+        radial-gradient(circle at 90% 0%, rgba(249, 115, 22, 0.14), transparent 32%),
+        linear-gradient(180deg, #ffffff 0%, var(--bg) 72%);
       min-height: 100vh;
     }
 
@@ -106,16 +101,17 @@ function renderPage(state) {
     }
 
     .mast {
-      border: 2px solid var(--ink);
+      border: 1px solid var(--line);
       background: var(--card);
-      padding: 22px 20px 18px;
-      box-shadow: 10px 10px 0 rgba(19,34,34,0.12);
+      padding: 26px 24px 20px;
+      border-radius: 18px;
+      box-shadow: 0 18px 45px rgba(20, 32, 51, 0.08);
     }
 
     .kicker {
       margin: 0;
       font-family: var(--mono);
-      font-size: 12px;
+      font-size: 11px;
       letter-spacing: 0.08em;
       text-transform: uppercase;
       color: var(--accent-2);
@@ -123,17 +119,18 @@ function renderPage(state) {
 
     h1 {
       margin: 10px 0 8px;
-      font-size: clamp(2rem, 6vw, 4rem);
-      line-height: 1;
+      font-size: clamp(2rem, 5.4vw, 3.6rem);
+      line-height: 1.02;
       letter-spacing: -0.03em;
       font-family: var(--sans);
+      color: #0f172a;
     }
 
     .summary {
       margin: 0;
       color: var(--muted);
-      font-size: 1rem;
-      line-height: 1.6;
+      font-size: 1.02rem;
+      line-height: 1.7;
       max-width: 62ch;
     }
 
@@ -142,14 +139,15 @@ function renderPage(state) {
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      padding: 6px 12px;
+      padding: 7px 13px;
       border: 1px solid var(--ok);
       color: var(--ok);
       font-family: var(--mono);
       font-size: 12px;
       text-transform: uppercase;
       letter-spacing: 0.08em;
-      background: #edfff3;
+      border-radius: 999px;
+      background: #ecfdf3;
     }
 
     .dot {
@@ -179,6 +177,9 @@ function renderPage(state) {
     .panel {
       border: 1px solid var(--line);
       background: var(--card);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 10px 25px rgba(20, 32, 51, 0.05);
     }
 
     .panel h2 {
@@ -189,7 +190,7 @@ function renderPage(state) {
       font-size: 0.98rem;
       text-transform: uppercase;
       letter-spacing: 0.06em;
-      background: #f3e9d9;
+      background: linear-gradient(90deg, #eef6ff, #f8fbff);
     }
 
     table {
@@ -211,7 +212,7 @@ function renderPage(state) {
       color: var(--muted);
       text-transform: uppercase;
       letter-spacing: 0.06em;
-      background: #faf4e8;
+      background: var(--chip);
     }
 
     td {
@@ -227,9 +228,10 @@ function renderPage(state) {
     }
 
     .metric {
-      border: 1px dashed var(--line);
-      padding: 10px;
-      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 11px;
+      background: var(--chip);
     }
 
     .metric b {
@@ -248,11 +250,13 @@ function renderPage(state) {
     .note {
       margin-top: 14px;
       border-left: 4px solid var(--accent);
-      background: #fff5ef;
+      background: #fff8f2;
       padding: 10px 12px;
       font-size: 0.92rem;
       line-height: 1.5;
       color: #5a3a2e;
+      border-bottom-left-radius: 10px;
+      border-top-left-radius: 10px;
     }
   </style>
 </head>
