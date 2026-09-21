@@ -209,6 +209,7 @@ function renderPage(state) {
       display: flex;
       gap: 10px;
       flex-wrap: wrap;
+      align-items: center;
     }
 
     .quick-links a {
@@ -299,6 +300,63 @@ function renderPage(state) {
 
     @media (max-width: 920px) {
       .board { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 640px) {
+      .wrap {
+        padding: 16px 12px 24px;
+      }
+
+      .mast {
+        padding: 18px 14px 14px;
+      }
+
+      h1 {
+        font-size: clamp(1.65rem, 8vw, 2.1rem);
+      }
+
+      .summary {
+        font-size: 0.95rem;
+      }
+
+      .quick-links,
+      .tabs {
+        gap: 6px;
+      }
+
+      .quick-links a,
+      .tab-btn {
+        width: 100%;
+        justify-content: center;
+      }
+
+      table,
+      tbody,
+      tr,
+      th,
+      td {
+        display: block;
+        width: 100%;
+      }
+
+      tr {
+        border-bottom: 1px solid var(--line);
+      }
+
+      th {
+        border-bottom: none;
+        padding-bottom: 4px;
+      }
+
+      td {
+        padding-top: 0;
+        padding-bottom: 10px;
+      }
+
+      .readme-body {
+        max-height: 58vh;
+        padding: 12px;
+      }
     }
 
     .panel {
@@ -422,7 +480,6 @@ function renderPage(state) {
       </p>
       <div class="quick-links">
         <a href="${escapeHtml(state.links.repo)}" target="_blank" rel="noopener noreferrer">ver repo</a>
-        <a href="${escapeHtml(state.links.readme)}" target="_blank" rel="noopener noreferrer">ver readme</a>
       </div>
       <div class="tabs">
         <button id="tab-runtime" class="tab-btn active" type="button">runtime</button>
