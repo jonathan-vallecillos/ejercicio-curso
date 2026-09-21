@@ -16,6 +16,13 @@ const POD_NAME = process.env.HOSTNAME || "local";
 const NODE_NAME = process.env.NODE_NAME || "";
 const PORT = Number(process.env.PORT || 3000);
 
+function toRawGithubReadmeUrl(url) {
+  if (!url) return "";
+  return String(url)
+    .replace("https://github.com/", "https://raw.githubusercontent.com/")
+    .replace("/blob/", "/");
+}
+
 function normalizeIp(value) {
   if (!value) return undefined;
   return String(value).split(",")[0].trim() || undefined;
@@ -62,6 +69,7 @@ function buildState(req) {
     links: {
       repo: REPO_URL,
       readme: README_URL,
+      readme_raw: toRawGithubReadmeUrl(README_URL),
     },
   };
 }
@@ -72,6 +80,24 @@ app.get("/healthz", (_req, res) => {
 
 app.get("/api", (_req, res) => {
   res.json(buildState(_req));
+});
+
+app.get("/readme/raw", async (_req, res) => {
+  try {
+    const response = await fetch(toRawGithubReadmeUrl(README_URL), {
+      headers: { "User-Agent": "eks-curso-readme-proxy" },
+    });
+
+    if (!response.ok) {
+      res.status(502).type("text/plain; charset=utf-8").send("No se pudo leer el README remoto de GitHub.");
+      return;
+    }
+
+    const markdown = await response.text();
+    res.type("text/plain; charset=utf-8").send(markdown);
+  } catch (_error) {
+    res.status(500).type("text/plain; charset=utf-8").send("No se pudo leer el README remoto de GitHub.");
+  }
 });
 
 app.get("/", (req, res) => {
@@ -218,6 +244,38 @@ function renderPage(state) {
       background: #ecfdf3;
     }
 
+    .tabs {
+      margin-top: 16px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .tab-btn {
+      border: 1px solid var(--line);
+      background: #fff;
+      color: #174e6a;
+      border-radius: 999px;
+      padding: 7px 12px;
+      font-family: var(--mono);
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .tab-btn.active {
+      background: #dff1ff;
+      border-color: #9ec8e5;
+      color: #0a3e58;
+    }
+
+    .tab-panel {
+      display: block;
+    }
+
+    .tab-panel.hidden {
+      display: none;
+    }
+
     .dot {
       width: 8px;
       height: 8px;
@@ -326,6 +384,23 @@ function renderPage(state) {
       border-bottom-left-radius: 10px;
       border-top-left-radius: 10px;
     }
+
+    .readme-wrap {
+      margin-top: 22px;
+    }
+
+    .readme-body {
+      margin: 0;
+      max-height: 66vh;
+      overflow: auto;
+      padding: 16px;
+      white-space: pre-wrap;
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.55;
+      background: #f8fbff;
+      color: #1b2a44;
+    }
   </style>
 </head>
 <body>
@@ -340,10 +415,14 @@ function renderPage(state) {
         <a href="${escapeHtml(state.links.repo)}" target="_blank" rel="noopener noreferrer">ver repo</a>
         <a href="${escapeHtml(state.links.readme)}" target="_blank" rel="noopener noreferrer">ver readme</a>
       </div>
+      <div class="tabs">
+        <button id="tab-runtime" class="tab-btn active" type="button">runtime</button>
+        <button id="tab-readme" class="tab-btn" type="button">readme github</button>
+      </div>
       <div class="live"><span class="dot"></span>estado en vivo</div>
     </section>
 
-    <section class="board">
+    <section id="panel-runtime" class="board tab-panel">
       <article class="panel">
         <h2>runtime snapshot</h2>
         <table>
@@ -404,7 +483,56 @@ function renderPage(state) {
         </div>
       </aside>
     </section>
+
+    <section id="panel-readme" class="readme-wrap tab-panel hidden">
+      <article class="panel">
+        <h2>readme del proyecto (desde github)</h2>
+        <pre id="readme-content" class="readme-body">Cargando README desde GitHub...</pre>
+      </article>
+    </section>
   </main>
+  <script>
+    (function () {
+      const runtimeButton = document.getElementById("tab-runtime");
+      const readmeButton = document.getElementById("tab-readme");
+      const runtimePanel = document.getElementById("panel-runtime");
+      const readmePanel = document.getElementById("panel-readme");
+      const readmeContent = document.getElementById("readme-content");
+      let readmeLoaded = false;
+
+      function setActiveTab(name) {
+        const readmeActive = name === "readme";
+        runtimeButton.classList.toggle("active", !readmeActive);
+        readmeButton.classList.toggle("active", readmeActive);
+        runtimePanel.classList.toggle("hidden", readmeActive);
+        readmePanel.classList.toggle("hidden", !readmeActive);
+      }
+
+      async function loadReadmeIfNeeded() {
+        if (readmeLoaded) return;
+        try {
+          const response = await fetch("/readme/raw", { headers: { Accept: "text/plain" } });
+          if (!response.ok) {
+            readmeContent.textContent = "No se pudo cargar el README desde GitHub.";
+            return;
+          }
+          readmeContent.textContent = await response.text();
+          readmeLoaded = true;
+        } catch (_error) {
+          readmeContent.textContent = "No se pudo cargar el README desde GitHub.";
+        }
+      }
+
+      runtimeButton.addEventListener("click", () => {
+        setActiveTab("runtime");
+      });
+
+      readmeButton.addEventListener("click", async () => {
+        setActiveTab("readme");
+        await loadReadmeIfNeeded();
+      });
+    })();
+  </script>
 </body>
 </html>`;
 }
