@@ -206,6 +206,12 @@ En esta practica, varios runs fallaron en el paso `Configure AWS credentials`.
 
 Al revisar el historial completo de runs, vi que no habia ninguno en `success`; todos estaban cayendo en el mismo paso de credenciales.
 
+Al capturar los claims reales del token OIDC en el runner, vi que `sub` venia en este formato:
+
+`repo:jonathan-vallecillos@<owner_id>/ejercicio-curso@<repo_id>:ref:refs/heads/main`
+
+Por eso el trust policy que esperaba el formato anterior de `sub` no estaba matcheando.
+
 Lo que significa en la practica:
 
 1. El pipeline ni siquiera llega al build de Docker.
@@ -242,7 +248,11 @@ aws iam get-role --role-name GitHubOIDCDeployRole
 
 Para evitar bloqueos por variaciones de `sub` entre eventos/refs de GitHub, deje el trust policy del repo en modo:
 
-`repo:jonathan-vallecillos/ejercicio-curso:*`
+usar claims estables en `StringEquals`:
+
+1. `token.actions.githubusercontent.com:aud = sts.amazonaws.com`
+2. `token.actions.githubusercontent.com:repository = jonathan-vallecillos/ejercicio-curso`
+3. `token.actions.githubusercontent.com:ref = refs/heads/main`
 
 Tambien ajuste el proveedor OIDC de AWS al thumbprint recomendado para GitHub:
 
