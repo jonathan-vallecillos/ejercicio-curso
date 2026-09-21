@@ -155,16 +155,63 @@ Checks aplicados:
 
 Si en red corporativa no resuelve DNS, probar desde red externa (hotspot, red residencial, etc.).
 
+## Como manejo cambios y redeploy (mi flujo real)
+
+Cuando hago un cambio (por ejemplo en UI o en la API), sigo este flujo:
+
+1. Hago el cambio en codigo, normalmente en [server.js](server.js) o en manifiestos de [k8s/deployment.yaml](k8s/deployment.yaml).
+2. Lo valido localmente con `npm start` y pruebas simples a `/healthz`, `/api` y `/`.
+3. Hago commit y push a `main`.
+4. Se dispara el workflow de [.github/workflows/deploy.yml](.github/workflows/deploy.yml).
+5. El pipeline construye imagen nueva, la sube a ECR y actualiza el Deployment en EKS.
+6. Kubernetes hace rollout gradualmente; cuando el pod nuevo esta sano, queda activo y termina el reemplazo.
+
+Lo importante para mi es que no tengo que bajar el servicio completo para publicar cambios. EKS reemplaza pods y ALB sigue enrutando trafico al pod saludable.
+
+## Como se reflejan los cambios en la URL publica
+
+En la URL publica del ALB, los cambios se ven cuando termina el rollout.
+
+Tambien se ven reflejados en runtime los metadatos:
+
+1. `commit`: cambia al SHA de la imagen desplegada.
+2. `version`: cambia segun los build args/env de la imagen.
+3. `pod`: cambia cuando responde otro pod (o cuando se renueva el pod en rollout).
+4. `node`: muestra el nodo donde corre el pod.
+5. `uptime_s`: se reinicia en pods nuevos y vuelve a crecer.
+
+Si quiero comprobar que de verdad se aplico el deploy, reviso:
+
+1. `kubectl -n demo rollout status deployment/web`
+2. `kubectl -n demo get pods -o wide`
+3. la URL publica y el bloque `runtime snapshot`.
+
 ## CI/CD (GitHub Actions)
 
-El workflow esta en [.github/workflows/deploy.yml](.github/workflows/deploy.yml).
+El workflow esta en [.github/workflows/deploy.yml](.github/workflows/deploy.yml) y es el que automatiza todo el despliegue.
 
-Hace lo siguiente:
+Pasos que ejecuta:
 
 1. Asume rol AWS via OIDC.
 2. Build y push de imagen con tag SHA.
-3. Update de imagen en Deployment.
-4. Rollout status y rollback automatico si falla.
+3. `kubectl apply` de manifiestos base.
+4. Update de imagen en Deployment.
+5. Rollout status y rollback automatico si falla.
+
+Si falla el paso de credenciales (OIDC/rol), no se genera imagen nueva y por eso la URL publica sigue mostrando la version anterior. En ese caso reviso trust policy del rol y permisos de GitHub Actions.
+
+## Ventajas que estoy aprovechando con Kubernetes + AWS
+
+Esto es lo que mas me aporta en esta practica:
+
+1. Despliegue continuo sin bajar todo el servicio.
+2. Rollout controlado y rollback rapido si algo sale mal.
+3. Exposicion publica limpia con Ingress + ALB, sin gestionar manualmente balanceador por app.
+4. Observabilidad basica inmediata con `kubectl get pods`, eventos y health checks.
+5. Escalabilidad: puedo subir replicas en Deployment sin redisenar la app.
+6. Trazabilidad real por commit/tag de imagen, util para auditoria de cambios.
+
+En resumen: para cambios frecuentes, este flujo me da mas seguridad que subir archivos a mano en un servidor unico.
 
 ## Archivos clave
 
