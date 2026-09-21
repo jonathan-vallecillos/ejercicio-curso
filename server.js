@@ -134,6 +134,7 @@ function renderPage(state) {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${escapeHtml(state.app)} | runtime board</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5.8.1/github-markdown.min.css">
   <style>
     :root {
       --bg: #f4f7fb;
@@ -393,13 +394,21 @@ function renderPage(state) {
       margin: 0;
       max-height: 66vh;
       overflow: auto;
-      padding: 16px;
-      white-space: pre-wrap;
-      font-family: var(--mono);
-      font-size: 12px;
-      line-height: 1.55;
+      padding: 18px;
       background: #f8fbff;
       color: #1b2a44;
+    }
+
+    .readme-body.markdown-body {
+      font-family: var(--sans);
+      font-size: 14px;
+      line-height: 1.65;
+      background: #f8fbff;
+    }
+
+    .readme-body.markdown-body pre,
+    .readme-body.markdown-body code {
+      font-family: var(--mono);
     }
   </style>
 </head>
@@ -487,10 +496,11 @@ function renderPage(state) {
     <section id="panel-readme" class="readme-wrap tab-panel hidden">
       <article class="panel">
         <h2>readme del proyecto (desde github)</h2>
-        <pre id="readme-content" class="readme-body">Cargando README desde GitHub...</pre>
+        <article id="readme-content" class="readme-body markdown-body">Cargando README desde GitHub...</article>
       </article>
     </section>
   </main>
+  <script src="https://cdn.jsdelivr.net/npm/showdown@2.1.0/dist/showdown.min.js"></script>
   <script>
     (function () {
       const runtimeButton = document.getElementById("tab-runtime");
@@ -516,7 +526,19 @@ function renderPage(state) {
             readmeContent.textContent = "No se pudo cargar el README desde GitHub.";
             return;
           }
-          readmeContent.textContent = await response.text();
+          const markdown = await response.text();
+          if (window.showdown && typeof window.showdown.Converter === "function") {
+            const converter = new window.showdown.Converter({
+              ghCompatibleHeaderId: true,
+              tables: true,
+              tasklists: true,
+              simpleLineBreaks: true,
+              strikethrough: true,
+            });
+            readmeContent.innerHTML = converter.makeHtml(markdown);
+          } else {
+            readmeContent.textContent = markdown;
+          }
           readmeLoaded = true;
         } catch (_error) {
           readmeContent.textContent = "No se pudo cargar el README desde GitHub.";
