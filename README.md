@@ -204,6 +204,8 @@ Si falla el paso de credenciales (OIDC/rol), no se genera imagen nueva y por eso
 
 En esta practica, varios runs fallaron en el paso `Configure AWS credentials`.
 
+Al revisar el historial completo de runs, vi que no habia ninguno en `success`; todos estaban cayendo en el mismo paso de credenciales.
+
 Lo que significa en la practica:
 
 1. El pipeline ni siquiera llega al build de Docker.
@@ -241,6 +243,18 @@ aws iam get-role --role-name GitHubOIDCDeployRole
 Para evitar bloqueos por variaciones de `sub` entre eventos/refs de GitHub, deje el trust policy del repo en modo:
 
 `repo:jonathan-vallecillos/ejercicio-curso:*`
+
+Tambien ajuste el proveedor OIDC de AWS al thumbprint recomendado para GitHub:
+
+`6938fd4d98bab03faadb97b34396831e3780aea1`
+
+Comando aplicado:
+
+```bash
+aws iam update-open-id-connect-provider-thumbprint \
+  --open-id-connect-provider-arn arn:aws:iam::580446611735:oidc-provider/token.actions.githubusercontent.com \
+  --thumbprint-list 6938fd4d98bab03faadb97b34396831e3780aea1
+```
 
 Eso mantiene el alcance en este repo (no abre a otros repositorios) y me evita fallas por formato de subject.
 
