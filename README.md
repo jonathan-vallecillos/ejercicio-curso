@@ -1,147 +1,93 @@
-# EKS deployment lab
+# Guia real del despliegue EKS (cuenta personal)
 
-Repositorio para desplegar una app Node.js en Amazon EKS con image build en Docker, push a ECR, publicacion automatica con GitHub Actions, y exposicion publica mediante AWS Load Balancer Controller + ALB.
+Este repositorio documenta, paso a paso, como se levanto una app Node.js en Amazon EKS usando ECR, Kubernetes e Ingress con AWS Load Balancer Controller.
 
-## Variables que debes cambiar
+No es plantilla generica: es la bitacora real del despliegue hecho en esta practica, con decisiones, cambios y comandos aplicados.
+
+## Resultado final
+
+- Repositorio GitHub: https://github.com/jonathan-vallecillos/ejercicio-curso
+- Cluster EKS: `jonathan-eks-lab` en `us-east-1`
+- Repositorio ECR: `ejercicio-curso-app`
+- Namespace de app: `demo`
+- URL del servicio: `http://k8s-demo-web-4f6400c9ed-785076910.us-east-1.elb.amazonaws.com`
+
+## Arquitectura usada
+
+1. App Node.js con Express en [server.js](server.js), con rutas:
+   - `/healthz`
+   - `/api`
+   - `/` con respuesta HTML o JSON segun `Accept`
+2. Imagen Docker en [Dockerfile](Dockerfile).
+3. Publicacion de imagen en ECR.
+4. Despliegue Kubernetes con:
+   - [k8s/namespace.yaml](k8s/namespace.yaml)
+   - [k8s/deployment.yaml](k8s/deployment.yaml)
+   - [k8s/service.yaml](k8s/service.yaml)
+   - [k8s/ingress.yaml](k8s/ingress.yaml)
+5. Exposicion publica con ALB (Ingress class `alb`).
+6. Pipeline CI/CD en [.github/workflows/deploy.yml](.github/workflows/deploy.yml) con OIDC.
+
+## Cambios concretos que se hicieron
+
+1. Se reemplazaron nombres del ejemplo por valores propios:
+   - app: `jonathan-eks-lab`
+   - cluster: `jonathan-eks-lab`
+   - ECR repo: `ejercicio-curso-app`
+2. Se actualizaron ARNs y trust policy para el repo real en:
+   - [iam/trust-policy.json](iam/trust-policy.json)
+   - [iam/deploy-policy.json](iam/deploy-policy.json)
+3. Se subio la imagen bootstrap a ECR y se dejo referenciada en [k8s/deployment.yaml](k8s/deployment.yaml).
+4. Se instalo AWS Load Balancer Controller con IRSA.
+5. Se corrigio un crash del controller agregando `vpcId` explicito en Helm (no dependio de IMDS).
+6. Se publico el Ingress y se confirmo target healthy en ALB.
+
+## Paso a paso (lo que se ejecuto)
+
+## 1) Preparar herramientas y credenciales
 
 ```bash
-export AWS_REGION=YOUR_AWS_REGION
-export AWS_ACCOUNT_ID=YOUR_AWS_ACCOUNT_ID
-export CLUSTER_NAME=YOUR_CLUSTER_NAME
-export ECR_REPO=YOUR_ECR_REPO
-export GITHUB_OWNER=YOUR_GITHUB_OWNER
-export GITHUB_REPO=YOUR_GITHUB_REPO
-export GITHUB_FULL_REPO=$GITHUB_OWNER/$GITHUB_REPO
-export NAMESPACE=demo
-export DEPLOYMENT_NAME=web
-export CONTAINER_NAME=web
-export AWS_DEPLOY_ROLE_ARN=YOUR_AWS_DEPLOY_ROLE_ARN
-export APP_VERSION=1.0.0
+aws sts get-caller-identity
+docker version
+kubectl version --client
+eksctl version
 ```
 
-## Estructura
-
-- [server.js](server.js) app Express con `/`, `/api` y `/healthz`
-- [Dockerfile](Dockerfile) imagen de produccion
-- [cluster.yaml](cluster.yaml) configuracion de EKS con `eksctl`
-- [k8s/](k8s) manifiestos Kubernetes
-- [iam/](iam) trust policy y deploy policy para GitHub Actions
-- [.github/workflows/deploy.yml](.github/workflows/deploy.yml) pipeline de despliegue
-- [alb-iam-policy.json](alb-iam-policy.json) policy para AWS Load Balancer Controller
-- [demo/](demo) material opcional para demos guiadas
-
-## App local
+## 2) Crear ECR y publicar imagen inicial
 
 ```bash
-npm install
-npm start
-```
+export AWS_REGION=us-east-1
+export AWS_ACCOUNT_ID=580446611735
+export ECR_REPO=ejercicio-curso-app
+export REGISTRY=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
 
-Pruebas rapidas:
+aws ecr create-repository \
+  --repository-name $ECR_REPO \
+  --image-scanning-configuration scanOnPush=true \
+  --region $AWS_REGION
 
-```bash
-curl http://localhost:3000/healthz
-curl http://localhost:3000/api
-curl -H "Accept: text/html" http://localhost:3000/
-curl http://localhost:3000/
-```
+aws ecr get-login-password --region $AWS_REGION \
+  | docker login --username AWS --password-stdin $REGISTRY
 
-## Construir imagen
-
-```bash
 docker build \
-  --build-arg APP_VERSION=$APP_VERSION \
-  --build-arg GIT_SHA=$(git rev-parse --short HEAD 2>/dev/null || echo local) \
-  -t eks-deploy-lab:local .
+  --build-arg APP_VERSION=1.0.0 \
+  --build-arg GIT_SHA=bootstrap \
+  -t $REGISTRY/$ECR_REPO:bootstrap .
+
+docker push $REGISTRY/$ECR_REPO:bootstrap
 ```
 
-## Crear el cluster
+## 3) Crear cluster EKS
 
-Edita [cluster.yaml](cluster.yaml) y reemplaza `YOUR_AWS_REGION` y `YOUR_CLUSTER_NAME`.
+El archivo usado fue [cluster.yaml](cluster.yaml), ya parametrizado para `jonathan-eks-lab` y `us-east-1`.
 
 ```bash
 eksctl create cluster -f cluster.yaml
-kubectl get nodes
 ```
 
-## Crear ECR
+Nota: por un tema de DNS local con el binario de eksctl en Windows, se ejecuto eksctl via contenedor Docker para crear cluster y nodegroup.
 
-```bash
-aws ecr create-repository \
-  --repository-name "$ECR_REPO" \
-  --image-scanning-configuration scanOnPush=true \
-  --region "$AWS_REGION"
-
-export REGISTRY="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
-aws ecr get-login-password --region "$AWS_REGION" \
-  | docker login --username AWS --password-stdin "$REGISTRY"
-
-docker build \
-  --build-arg APP_VERSION=$APP_VERSION \
-  --build-arg GIT_SHA=$(git rev-parse --short HEAD 2>/dev/null || echo local) \
-  -t "$REGISTRY/$ECR_REPO:bootstrap" .
-docker push "$REGISTRY/$ECR_REPO:bootstrap"
-```
-
-## Aplicar Kubernetes
-
-Actualiza [k8s/deployment.yaml](k8s/deployment.yaml) con tu imagen inicial antes del primer apply.
-
-```bash
-kubectl apply -f k8s/namespace.yaml
-kubectl apply -f k8s/deployment.yaml
-kubectl apply -f k8s/service.yaml
-kubectl -n "$NAMESPACE" rollout status deployment/$DEPLOYMENT_NAME
-```
-
-Si ya instalaste el ALB controller:
-
-```bash
-kubectl apply -f k8s/ingress.yaml
-kubectl -n "$NAMESPACE" get ingress
-```
-
-## AWS Load Balancer Controller
-
-1. Crea la policy desde [alb-iam-policy.json](alb-iam-policy.json) con un nombre propio, por ejemplo `EKSLoadBalancerControllerPolicy`.
-2. Crea el service account con IRSA.
-3. Instala el chart Helm del controller.
-
-Comandos base:
-
-```bash
-aws iam create-policy \
-  --policy-name EKSLoadBalancerControllerPolicy \
-  --policy-document file://alb-iam-policy.json
-
-eksctl create iamserviceaccount \
-  --cluster="$CLUSTER_NAME" \
-  --region="$AWS_REGION" \
-  --namespace=kube-system \
-  --name=aws-load-balancer-controller \
-  --role-name EKSLoadBalancerControllerRole \
-  --attach-policy-arn=arn:aws:iam::$AWS_ACCOUNT_ID:policy/EKSLoadBalancerControllerPolicy \
-  --approve
-
-helm repo add eks https://aws.github.io/eks-charts
-helm repo update
-helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-controller \
-  -n kube-system \
-  --set clusterName="$CLUSTER_NAME" \
-  --set serviceAccount.create=false \
-  --set serviceAccount.name=aws-load-balancer-controller \
-  --set region="$AWS_REGION"
-```
-
-## OIDC para GitHub Actions
-
-1. Crea el provider OIDC de GitHub en AWS.
-2. Sustituye los placeholders en [iam/trust-policy.json](iam/trust-policy.json) y [iam/deploy-policy.json](iam/deploy-policy.json).
-3. Crea el rol y adjunta la policy.
-4. Crea el access entry del cluster para ese rol.
-5. Guarda `AWS_DEPLOY_ROLE_ARN` como secret en GitHub.
-
-Ejemplo:
+## 4) Configurar OIDC y rol para GitHub Actions
 
 ```bash
 aws iam create-open-id-connect-provider \
@@ -156,62 +102,80 @@ aws iam put-role-policy \
   --role-name GitHubOIDCDeployRole \
   --policy-name deploy \
   --policy-document file://iam/deploy-policy.json
-
-export AWS_DEPLOY_ROLE_ARN="arn:aws:iam::$AWS_ACCOUNT_ID:role/GitHubOIDCDeployRole"
-
-aws eks create-access-entry \
-  --cluster-name "$CLUSTER_NAME" \
-  --region "$AWS_REGION" \
-  --principal-arn "$AWS_DEPLOY_ROLE_ARN" \
-  --type STANDARD
-
-aws eks associate-access-policy \
-  --cluster-name "$CLUSTER_NAME" \
-  --region "$AWS_REGION" \
-  --principal-arn "$AWS_DEPLOY_ROLE_ARN" \
-  --policy-arn arn:aws:eks::aws:cluster-access-policy/AmazonEKSEditPolicy \
-  --access-scope type=namespace,namespaces=$NAMESPACE
 ```
 
-## Configurar GitHub
+Valor a guardar en secret de GitHub (`AWS_DEPLOY_ROLE_ARN`):
 
-Agrega estos secrets o variables:
+`arn:aws:iam::580446611735:role/GitHubOIDCDeployRole`
 
-- `AWS_DEPLOY_ROLE_ARN`
-- `AWS_REGION`
-- `AWS_ACCOUNT_ID`
-- `CLUSTER_NAME`
-- `ECR_REPO`
+## 5) Instalar AWS Load Balancer Controller
 
-El workflow asume `main` y usa `kubectl set image` para publicar el nuevo SHA.
+1. Crear policy local con [alb-iam-policy.json](alb-iam-policy.json).
+2. Crear service account con IRSA.
+3. Instalar chart con Helm.
 
-## Validar URL publica
-
-Cuando el Ingress este listo, obtiene el hostname del ALB:
+Comando Helm final aplicado (el importante fue `vpcId`):
 
 ```bash
-kubectl -n "$NAMESPACE" get ingress web -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'; echo
+helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-controller \
+  -n kube-system \
+  --set clusterName=jonathan-eks-lab \
+  --set serviceAccount.create=false \
+  --set serviceAccount.name=aws-load-balancer-controller \
+  --set region=us-east-1 \
+  --set vpcId=<VPC_ID_DEL_CLUSTER> \
+  --set replicaCount=1
 ```
 
-Pruebas:
+## 6) Desplegar app en Kubernetes
 
 ```bash
-curl http://$ALB_HOSTNAME/healthz
-curl http://$ALB_HOSTNAME/api
-curl -H "Accept: text/html" http://$ALB_HOSTNAME/
+kubectl apply -f k8s/namespace.yaml
+kubectl apply -f k8s/deployment.yaml
+kubectl apply -f k8s/service.yaml
+kubectl apply -f k8s/ingress.yaml
+
+kubectl -n demo rollout status deployment/web
+kubectl -n demo get pods -o wide
+kubectl -n demo get ingress web -o wide
 ```
 
-## Rollback
+## 7) Validacion
 
-```bash
-kubectl -n "$NAMESPACE" rollout history deployment/$DEPLOYMENT_NAME
-kubectl -n "$NAMESPACE" rollout undo deployment/$DEPLOYMENT_NAME
-kubectl -n "$NAMESPACE" rollout status deployment/$DEPLOYMENT_NAME
-```
+Checks aplicados:
 
-## Limpieza
+1. Pod web en `Running`.
+2. Ingress reconciliado por ALB Controller.
+3. ALB en estado `active` por `aws elbv2 describe-load-balancers`.
+4. Target group en `healthy` por `aws elbv2 describe-target-health`.
 
-Primero elimina el Ingress para no dejar un ALB huérfano.
+## URL del servicio
+
+`http://k8s-demo-web-4f6400c9ed-785076910.us-east-1.elb.amazonaws.com`
+
+Si en red corporativa no resuelve DNS, probar desde red externa (hotspot, red residencial, etc.).
+
+## CI/CD (GitHub Actions)
+
+El workflow esta en [.github/workflows/deploy.yml](.github/workflows/deploy.yml).
+
+Hace lo siguiente:
+
+1. Asume rol AWS via OIDC.
+2. Build y push de imagen con tag SHA.
+3. Update de imagen en Deployment.
+4. Rollout status y rollback automatico si falla.
+
+## Archivos clave
+
+1. Aplicacion: [server.js](server.js)
+2. Imagen: [Dockerfile](Dockerfile)
+3. Cluster: [cluster.yaml](cluster.yaml)
+4. Manifiestos k8s: [k8s/deployment.yaml](k8s/deployment.yaml), [k8s/service.yaml](k8s/service.yaml), [k8s/ingress.yaml](k8s/ingress.yaml)
+5. IAM OIDC: [iam/trust-policy.json](iam/trust-policy.json), [iam/deploy-policy.json](iam/deploy-policy.json)
+6. Pipeline: [.github/workflows/deploy.yml](.github/workflows/deploy.yml)
+
+## Limpieza recomendada (para evitar costos)
 
 ```bash
 kubectl delete -f k8s/ingress.yaml
@@ -219,12 +183,8 @@ kubectl delete -f k8s/service.yaml
 kubectl delete -f k8s/deployment.yaml
 kubectl delete -f k8s/namespace.yaml
 
-eksctl delete cluster --name "$CLUSTER_NAME" --region "$AWS_REGION" --wait
-aws ecr delete-repository --repository-name "$ECR_REPO" --force --region "$AWS_REGION"
+eksctl delete cluster --name jonathan-eks-lab --region us-east-1 --wait
+aws ecr delete-repository --repository-name ejercicio-curso-app --force --region us-east-1
 aws iam delete-role-policy --role-name GitHubOIDCDeployRole --policy-name deploy
 aws iam delete-role --role-name GitHubOIDCDeployRole
 ```
-
-## Costo aproximado
-
-El costo depende de la region, tipo de nodo y tiempo encendido. Como referencia, un entorno pequeno con 2 nodos t3.medium, ALB y NAT Gateway suele estar en el orden de decenas o mas de cien USD al mes si queda encendido todo el tiempo. Para laboratorios cortos, el costo baja de forma importante.

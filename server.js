@@ -59,265 +59,248 @@ function escapeHtml(value) {
 }
 
 function renderPage(state) {
-  const chips = [
-    ["Version", state.version],
-    ["Commit", state.commit],
-    ["Region", state.region],
-    ["Pod", state.pod],
-    ["Node", state.node || "not-set"],
-    ["Uptime", `${state.uptime_s}s`],
-  ];
-
   return `<!doctype html>
 <html lang="es">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>${escapeHtml(state.app)} | EKS deployment lab</title>
+  <title>${escapeHtml(state.app)} | runtime board</title>
   <style>
     :root {
-      color-scheme: light;
-      --bg: #08111f;
-      --bg-2: #0f1c31;
-      --panel: rgba(255, 255, 255, 0.08);
-      --panel-border: rgba(255, 255, 255, 0.14);
-      --text: #eef4ff;
-      --muted: #b4c2df;
-      --accent: #6ee7ff;
-      --accent-2: #8b5cf6;
-      --success: #34d399;
-      --shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --paper: #f7f2e9;
+      --ink: #132222;
+      --muted: #465b5c;
+      --line: #d2c7b8;
+      --card: #fffdf8;
+      --accent: #bf4f24;
+      --accent-2: #0f7a75;
+      --ok: #177f45;
+      --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      --serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, serif;
+      --sans: "Aptos", "Segoe UI", Tahoma, sans-serif;
     }
 
     * { box-sizing: border-box; }
+
     body {
       margin: 0;
-      min-height: 100vh;
-      color: var(--text);
+      color: var(--ink);
+      font-family: var(--serif);
       background:
-        radial-gradient(circle at top left, rgba(110, 231, 255, 0.16), transparent 34%),
-        radial-gradient(circle at 80% 10%, rgba(139, 92, 246, 0.20), transparent 28%),
-        linear-gradient(160deg, var(--bg), var(--bg-2));
+        linear-gradient(180deg, rgba(255,255,255,0.3), rgba(255,255,255,0.3)),
+        repeating-linear-gradient(
+          0deg,
+          transparent,
+          transparent 31px,
+          rgba(19,34,34,0.05) 31px,
+          rgba(19,34,34,0.05) 32px
+        ),
+        var(--paper);
+      min-height: 100vh;
     }
 
     .wrap {
-      max-width: 1160px;
+      max-width: 1080px;
       margin: 0 auto;
-      padding: 40px 24px 32px;
+      padding: 28px 18px 44px;
     }
 
-    .hero {
-      display: grid;
-      grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
-      gap: 28px;
-      align-items: stretch;
-      margin-top: 10px;
+    .mast {
+      border: 2px solid var(--ink);
+      background: var(--card);
+      padding: 22px 20px 18px;
+      box-shadow: 10px 10px 0 rgba(19,34,34,0.12);
     }
 
-    @media (max-width: 900px) {
-      .hero { grid-template-columns: 1fr; }
-    }
-
-    .headline {
-      padding: 34px;
-      border-radius: 28px;
-      background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
-      border: 1px solid var(--panel-border);
-      box-shadow: var(--shadow);
-      position: relative;
-      overflow: hidden;
-    }
-
-    .headline::after {
-      content: "";
-      position: absolute;
-      inset: auto -10% -30% auto;
-      width: 240px;
-      height: 240px;
-      border-radius: 999px;
-      background: radial-gradient(circle, rgba(110, 231, 255, 0.22), transparent 62%);
-      pointer-events: none;
-    }
-
-    .eyebrow {
-      display: inline-flex;
-      gap: 10px;
-      align-items: center;
-      padding: 8px 12px;
-      border-radius: 999px;
-      background: rgba(255,255,255,0.08);
-      border: 1px solid rgba(255,255,255,0.12);
-      color: var(--muted);
+    .kicker {
+      margin: 0;
+      font-family: var(--mono);
+      font-size: 12px;
       letter-spacing: 0.08em;
       text-transform: uppercase;
-      font-size: 12px;
-      font-weight: 700;
+      color: var(--accent-2);
     }
 
     h1 {
-      font-size: clamp(2.5rem, 7vw, 4.9rem);
-      line-height: 0.96;
-      margin: 22px 0 18px;
-      max-width: 10ch;
-      letter-spacing: -0.05em;
+      margin: 10px 0 8px;
+      font-size: clamp(2rem, 6vw, 4rem);
+      line-height: 1;
+      letter-spacing: -0.03em;
+      font-family: var(--sans);
     }
 
-    .lede {
+    .summary {
       margin: 0;
-      max-width: 56ch;
       color: var(--muted);
-      font-size: 1.05rem;
-      line-height: 1.7;
+      font-size: 1rem;
+      line-height: 1.6;
+      max-width: 62ch;
     }
 
-    .stats {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 14px;
-      margin-top: 28px;
-    }
-
-    @media (max-width: 620px) {
-      .stats { grid-template-columns: 1fr; }
-    }
-
-    .stat,
-    .panel {
-      border-radius: 22px;
-      background: rgba(255,255,255,0.06);
-      border: 1px solid rgba(255,255,255,0.12);
-      box-shadow: var(--shadow);
-    }
-
-    .stat {
-      padding: 18px 18px 16px;
-    }
-
-    .stat span {
-      display: block;
-      color: var(--muted);
+    .live {
+      margin-top: 14px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      border: 1px solid var(--ok);
+      color: var(--ok);
+      font-family: var(--mono);
       font-size: 12px;
       text-transform: uppercase;
-      letter-spacing: 0.12em;
+      letter-spacing: 0.08em;
+      background: #edfff3;
     }
 
-    .stat strong {
-      display: block;
-      margin-top: 9px;
-      font-size: 1.1rem;
-      word-break: break-word;
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--ok);
+      animation: blink 1.8s ease-in-out infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.25; }
+    }
+
+    .board {
+      margin-top: 22px;
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 14px;
+    }
+
+    @media (max-width: 920px) {
+      .board { grid-template-columns: 1fr; }
     }
 
     .panel {
-      padding: 28px;
-      display: flex;
-      flex-direction: column;
-      gap: 18px;
+      border: 1px solid var(--line);
+      background: var(--card);
     }
 
     .panel h2 {
       margin: 0;
-      font-size: 1.2rem;
-      letter-spacing: -0.02em;
-    }
-
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      width: fit-content;
-      padding: 10px 14px;
-      border-radius: 999px;
-      background: rgba(52, 211, 153, 0.12);
-      color: #baf7dd;
-      border: 1px solid rgba(52, 211, 153, 0.24);
-      font-size: 13px;
-      font-weight: 700;
-    }
-
-    .badge i {
-      width: 9px;
-      height: 9px;
-      border-radius: 999px;
-      background: var(--success);
-      box-shadow: 0 0 0 6px rgba(52, 211, 153, 0.16);
-    }
-
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 12px;
-    }
-
-    .chip {
-      padding: 14px 16px;
-      border-radius: 18px;
-      background: rgba(8, 17, 31, 0.45);
-      border: 1px solid rgba(255,255,255,0.1);
-    }
-
-    .chip span {
-      display: block;
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-      color: var(--muted);
-      margin-bottom: 8px;
-    }
-
-    .chip strong {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      font-family: var(--sans);
       font-size: 0.98rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      background: #f3e9d9;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      border-bottom: 1px solid var(--line);
+      padding: 10px 12px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      width: 36%;
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      background: #faf4e8;
+    }
+
+    td {
+      font-family: var(--mono);
+      font-size: 13px;
       word-break: break-word;
     }
 
-    .footer {
-      margin-top: 24px;
-      color: var(--muted);
+    .meter {
+      padding: 12px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .metric {
+      border: 1px dashed var(--line);
+      padding: 10px;
+      background: #fff;
+    }
+
+    .metric b {
+      display: block;
+      margin-bottom: 3px;
+      font-family: var(--sans);
+      font-size: 0.9rem;
+    }
+
+    .metric span {
+      font-family: var(--mono);
+      color: var(--accent);
       font-size: 0.95rem;
     }
 
-    code {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: 0.95em;
-      color: var(--accent);
+    .note {
+      margin-top: 14px;
+      border-left: 4px solid var(--accent);
+      background: #fff5ef;
+      padding: 10px 12px;
+      font-size: 0.92rem;
+      line-height: 1.5;
+      color: #5a3a2e;
     }
   </style>
 </head>
 <body>
   <main class="wrap">
-    <section class="hero">
-      <article class="headline">
-        <div class="eyebrow">AWS EKS + ALB + GitHub Actions</div>
-        <h1>${escapeHtml(state.app)}</h1>
-        <p class="lede">
-          This service is designed to deploy through ECR and EKS, expose itself with an ALB Ingress, and show the runtime metadata coming from the running pod.
-        </p>
+    <section class="mast">
+      <p class="kicker">journal / deploy report / live pod</p>
+      <h1>${escapeHtml(state.app)}</h1>
+      <p class="summary">
+        Este tablero muestra la telemetria real del contenedor que respondio la solicitud. Si cambias de pod durante el balanceo, los datos cambian en la siguiente peticion.
+      </p>
+      <div class="live"><span class="dot"></span>estado en vivo</div>
+    </section>
 
-        <div class="stats">
-          <div class="stat"><span>Version</span><strong>${escapeHtml(state.version)}</strong></div>
-          <div class="stat"><span>Commit</span><strong>${escapeHtml(state.commit)}</strong></div>
-          <div class="stat"><span>Uptime</span><strong>${escapeHtml(state.uptime_s)} s</strong></div>
-        </div>
+    <section class="board">
+      <article class="panel">
+        <h2>runtime snapshot</h2>
+        <table>
+          <tbody>
+            <tr><th>app</th><td>${escapeHtml(state.app)}</td></tr>
+            <tr><th>version</th><td>${escapeHtml(state.version)}</td></tr>
+            <tr><th>commit</th><td>${escapeHtml(state.commit)}</td></tr>
+            <tr><th>region</th><td>${escapeHtml(state.region)}</td></tr>
+            <tr><th>pod</th><td>${escapeHtml(state.pod)}</td></tr>
+            <tr><th>node</th><td>${escapeHtml(state.node || "not-set")}</td></tr>
+            <tr><th>uptime</th><td>${escapeHtml(`${state.uptime_s}s`)}</td></tr>
+          </tbody>
+        </table>
       </article>
 
       <aside class="panel">
-        <div class="badge"><i></i> Health path is green</div>
-        <h2>Runtime details</h2>
-        <div class="grid">
-          ${chips
-            .map(
-              ([label, value]) => `
-                <div class="chip">
-                  <span>${escapeHtml(label)}</span>
-                  <strong>${escapeHtml(value)}</strong>
-                </div>
-              `,
-            )
-            .join("")}
+        <h2>checks</h2>
+        <div class="meter">
+          <div class="metric">
+            <b>health endpoint</b>
+            <span>/healthz -> ok</span>
+          </div>
+          <div class="metric">
+            <b>api endpoint</b>
+            <span>/api -> json</span>
+          </div>
+          <div class="metric">
+            <b>home endpoint</b>
+            <span>/ -> html/json</span>
+          </div>
         </div>
-        <div class="footer">
-          JSON is returned for <code>curl</code>, while a browser gets this page.
+        <div class="note">
+          Con <strong>curl</strong> sobre <strong>/</strong> recibes JSON. En navegador se renderiza esta vista.
         </div>
       </aside>
     </section>
