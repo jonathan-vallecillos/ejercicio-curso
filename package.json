@@ -1,0 +1,13 @@
+{
+  "name": "eks-deploy-lab",
+  "version": "1.0.0",
+  "private": true,
+  "main": "server.js",
+  "description": "Node.js app for an AWS EKS + ALB deployment lab",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^5.1.0"
+  }
+}

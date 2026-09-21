@@ -1,0 +1,79 @@
+name: Build and deploy to EKS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: YOUR_AWS_REGION
+  CLUSTER_NAME: YOUR_CLUSTER_NAME
+  ECR_REPO: YOUR_ECR_REPO
+  NAMESPACE: demo
+  DEPLOYMENT: web
+  CONTAINER: web
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: gha-${{ github.run_id }}
+
+      - name: Login to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push image
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          TAG: ${{ github.sha }}
+        run: |
+          docker build \
+            --build-arg APP_VERSION=$TAG \
+            --build-arg GIT_SHA=$TAG \
+            -t $REGISTRY/$ECR_REPO:$TAG .
+          docker push $REGISTRY/$ECR_REPO:$TAG
+
+      - name: Configure kubeconfig
+        run: aws eks update-kubeconfig --name $CLUSTER_NAME --region $AWS_REGION
+
+      - name: Update deployment image
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          TAG: ${{ github.sha }}
+        run: |
+          kubectl -n $NAMESPACE set image deployment/$DEPLOYMENT \
+            $CONTAINER=$REGISTRY/$ECR_REPO:$TAG
+          kubectl -n $NAMESPACE annotate deployment/$DEPLOYMENT \
+            kubernetes.io/change-cause="commit ${{ github.sha }} by ${{ github.actor }}" \
+            --overwrite
+
+      - name: Wait for rollout and rollback if needed
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          TAG: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if ! kubectl -n $NAMESPACE rollout status deployment/$DEPLOYMENT --timeout=180s; then
+            kubectl -n $NAMESPACE rollout undo deployment/$DEPLOYMENT
+            kubectl -n $NAMESPACE rollout status deployment/$DEPLOYMENT --timeout=180s || true
+            exit 1
+          fi

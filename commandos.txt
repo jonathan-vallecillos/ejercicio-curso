@@ -1,0 +1,73 @@
+Variables base
+
+```bash
+export AWS_REGION=YOUR_AWS_REGION
+export AWS_ACCOUNT_ID=YOUR_AWS_ACCOUNT_ID
+export CLUSTER_NAME=YOUR_CLUSTER_NAME
+export ECR_REPO=YOUR_ECR_REPO
+export NAMESPACE=demo
+export REGISTRY=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+```
+
+App local
+
+```bash
+npm install
+npm start
+curl http://localhost:3000/
+curl http://localhost:3000/api
+curl http://localhost:3000/healthz
+```
+
+Build y push
+
+```bash
+aws ecr create-repository --repository-name "$ECR_REPO" --region "$AWS_REGION"
+aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$REGISTRY"
+docker build --build-arg APP_VERSION=1.0.0 --build-arg GIT_SHA=local -t "$REGISTRY/$ECR_REPO:bootstrap" .
+docker push "$REGISTRY/$ECR_REPO:bootstrap"
+```
+
+Kubernetes
+
+```bash
+kubectl apply -f k8s/namespace.yaml
+kubectl apply -f k8s/deployment.yaml
+kubectl apply -f k8s/service.yaml
+kubectl apply -f k8s/ingress.yaml
+kubectl -n "$NAMESPACE" rollout status deployment/web
+kubectl -n "$NAMESPACE" get ingress web
+```
+
+Controller ALB
+
+```bash
+aws iam create-policy --policy-name EKSLoadBalancerControllerPolicy --policy-document file://alb-iam-policy.json
+eksctl create iamserviceaccount --cluster="$CLUSTER_NAME" --region="$AWS_REGION" --namespace=kube-system --name=aws-load-balancer-controller --role-name EKSLoadBalancerControllerRole --attach-policy-arn=arn:aws:iam::$AWS_ACCOUNT_ID:policy/EKSLoadBalancerControllerPolicy --approve
+helm repo add eks https://aws.github.io/eks-charts
+helm repo update
+helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-controller -n kube-system --set clusterName="$CLUSTER_NAME" --set serviceAccount.create=false --set serviceAccount.name=aws-load-balancer-controller --set region="$AWS_REGION"
+```
+
+OIDC y deploy role
+
+```bash
+aws iam create-open-id-connect-provider --url https://token.actions.githubusercontent.com --client-id-list sts.amazonaws.com
+aws iam create-role --role-name GitHubOIDCDeployRole --assume-role-policy-document file://iam/trust-policy.json
+aws iam put-role-policy --role-name GitHubOIDCDeployRole --policy-name deploy --policy-document file://iam/deploy-policy.json
+aws eks create-access-entry --cluster-name "$CLUSTER_NAME" --region "$AWS_REGION" --principal-arn "arn:aws:iam::$AWS_ACCOUNT_ID:role/GitHubOIDCDeployRole" --type STANDARD
+aws eks associate-access-policy --cluster-name "$CLUSTER_NAME" --region "$AWS_REGION" --principal-arn "arn:aws:iam::$AWS_ACCOUNT_ID:role/GitHubOIDCDeployRole" --policy-arn arn:aws:eks::aws:cluster-access-policy/AmazonEKSEditPolicy --access-scope type=namespace,namespaces=$NAMESPACE
+```
+
+Limpieza
+
+```bash
+kubectl delete -f k8s/ingress.yaml
+kubectl delete -f k8s/service.yaml
+kubectl delete -f k8s/deployment.yaml
+kubectl delete -f k8s/namespace.yaml
+eksctl delete cluster --name "$CLUSTER_NAME" --region "$AWS_REGION" --wait
+aws ecr delete-repository --repository-name "$ECR_REPO" --force --region "$AWS_REGION"
+aws iam delete-role-policy --role-name GitHubOIDCDeployRole --policy-name deploy
+aws iam delete-role --role-name GitHubOIDCDeployRole
+```
