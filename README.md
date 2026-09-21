@@ -165,6 +165,7 @@ Ademas de app/version/commit/pod, agregue datos operativos para tener mejor visi
 4. `started_at` y `now` en formato ISO.
 5. `build_date` de la imagen.
 6. Datos del request entrante (`host`, `x-forwarded-proto`, `x-forwarded-for`, modo html/json).
+7. Enlaces directos a repo y README desde la misma UI.
 
 Esto me ayuda a validar rapido si realmente estoy pegandole al pod correcto, si cambio de replica, y si estoy viendo una imagen nueva.
 
@@ -340,6 +341,54 @@ Deje archivos listos en:
 
 1. [cloudflare/worker.js](cloudflare/worker.js)
 2. [cloudflare/wrangler.toml](cloudflare/wrangler.toml)
+
+### Lo que hice yo en esta practica (paso a paso, por CLI)
+
+1. Entre al directorio de Cloudflare.
+2. Verifique Wrangler con `npx wrangler --version`.
+3. Como no habia login, use deploy temporal:
+
+```bash
+cd cloudflare
+npx wrangler deploy --temporary
+```
+
+4. Wrangler pidio aceptar terminos (escribir `yes`).
+5. Cloudflare resolvio challenge y creo una cuenta temporal automaticamente.
+6. Publico el Worker y devolvio URL activa.
+
+URL que quedo publicada en esta sesion:
+
+`https://eks-curso-proxy.famous-speech.workers.dev`
+
+7. Valide disponibilidad con:
+
+```bash
+curl -I https://eks-curso-proxy.famous-speech.workers.dev
+```
+
+Respuesta: `200 OK`.
+
+### Nota importante que me dejo Cloudflare
+
+Como el deploy fue temporal, Cloudflare da un link de claim de cuenta con tiempo limitado. Si lo reclamo, el Worker queda bajo mi control permanente en mi cuenta.
+
+### Como lo vuelvo a desplegar luego
+
+Si solo cambie codigo del Worker:
+
+```bash
+cd cloudflare
+npx wrangler deploy --temporary
+```
+
+Si ya tengo cuenta fija con login de Wrangler:
+
+```bash
+npx wrangler login
+cd cloudflare
+npx wrangler deploy
+```
 
 ### Opcion A (gratis inmediata): subdominio workers.dev
 

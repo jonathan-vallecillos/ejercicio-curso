@@ -10,6 +10,8 @@ const AWS_REGION = process.env.AWS_REGION || "unknown-region";
 const CLUSTER_NAME = process.env.CLUSTER_NAME || "unknown-cluster";
 const NAMESPACE = process.env.NAMESPACE || "demo";
 const BUILD_DATE = process.env.BUILD_DATE || "unknown";
+const REPO_URL = process.env.REPO_URL || "https://github.com/jonathan-vallecillos/ejercicio-curso";
+const README_URL = process.env.README_URL || "https://github.com/jonathan-vallecillos/ejercicio-curso/blob/main/README.md";
 const POD_NAME = process.env.HOSTNAME || "local";
 const NODE_NAME = process.env.NODE_NAME || "";
 const PORT = Number(process.env.PORT || 3000);
@@ -56,6 +58,10 @@ function buildState(req) {
       forwarded_proto: req?.headers?.["x-forwarded-proto"],
       forwarded_for: normalizeIp(req?.headers?.["x-forwarded-for"]),
       accepts_html: acceptsHtml,
+    },
+    links: {
+      repo: REPO_URL,
+      readme: README_URL,
     },
   };
 }
@@ -169,6 +175,31 @@ function renderPage(state) {
       font-size: 1.02rem;
       line-height: 1.7;
       max-width: 62ch;
+    }
+
+    .quick-links {
+      margin-top: 14px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .quick-links a {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      text-decoration: none;
+      font-family: var(--mono);
+      font-size: 12px;
+      color: #0b3d55;
+      background: #e8f6ff;
+      border: 1px solid #b8dcef;
+      border-radius: 999px;
+      padding: 6px 10px;
+    }
+
+    .quick-links a:hover {
+      background: #d7efff;
     }
 
     .live {
@@ -305,6 +336,10 @@ function renderPage(state) {
       <p class="summary">
         Este tablero muestra la telemetria real del contenedor que respondio la solicitud. Si cambias de pod durante el balanceo, los datos cambian en la siguiente peticion.
       </p>
+      <div class="quick-links">
+        <a href="${escapeHtml(state.links.repo)}" target="_blank" rel="noopener noreferrer">ver repo</a>
+        <a href="${escapeHtml(state.links.readme)}" target="_blank" rel="noopener noreferrer">ver readme</a>
+      </div>
       <div class="live"><span class="dot"></span>estado en vivo</div>
     </section>
 
